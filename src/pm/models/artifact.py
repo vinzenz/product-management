@@ -15,6 +15,33 @@ class ArtifactStatus(str, Enum):
     VERIFIED = "verified"
 
 
+class TaskStatus(str, Enum):
+    """Status for tasks."""
+
+    PENDING = "pending"
+    IN_PROGRESS = "in_progress"
+    COMPLETED = "completed"
+    FAILED = "failed"
+    BLOCKED = "blocked"
+
+
+class TaskComplexity(str, Enum):
+    """Estimated complexity for tasks."""
+
+    TRIVIAL = "trivial"
+    SIMPLE = "simple"
+    MEDIUM = "medium"
+    COMPLEX = "complex"
+
+
+class TaskTrack(str, Enum):
+    """Track/domain for tasks."""
+
+    BACKEND = "backend"
+    FRONTEND = "frontend"
+    SHARED = "shared"
+
+
 class Priority(str, Enum):
     """MoSCoW priority levels."""
 
@@ -189,3 +216,131 @@ def _extract_checklist(content: str, section_name: str) -> list[str]:
         if line.startswith("- [ ] ") or line.startswith("- [x] "):
             items.append(line[6:])
     return items
+
+
+def _extract_code_block(content: str, section_name: str) -> str:
+    """Extract code block content from a section."""
+    section = _extract_section(content, section_name)
+    lines = section.split("\n")
+    in_code = False
+    code_lines = []
+
+    for line in lines:
+        if line.startswith("```"):
+            if in_code:
+                break
+            in_code = True
+            continue
+        if in_code:
+            code_lines.append(line)
+
+    return "\n".join(code_lines)
+
+
+@dataclass
+class Task:
+    """A task for autonomous execution."""
+
+    id: str
+    title: str
+    status: TaskStatus = TaskStatus.PENDING
+    layer: int = 1
+    track: TaskTrack = TaskTrack.BACKEND
+    depends_on: list[str] = field(default_factory=list)
+    estimated_complexity: TaskComplexity = TaskComplexity.MEDIUM
+    requirement: Optional[str] = None
+    created: datetime = field(default_factory=datetime.now)
+    updated: datetime = field(default_factory=datetime.now)
+
+    # Contract-driven task content
+    contract: str = ""
+    dependencies: str = ""
+    test_specification: str = ""
+    output_files: str = ""
+    verification: str = ""
+    done_when: list[str] = field(default_factory=list)
+
+    def to_frontmatter(self) -> dict:
+        """Convert to YAML frontmatter dict."""
+        return {
+            "id": self.id,
+            "title": self.title,
+            "status": self.status.value,
+            "layer": self.layer,
+            "track": self.track.value,
+            "depends_on": self.depends_on,
+            "estimated_complexity": self.estimated_complexity.value,
+            "requirement": self.requirement,
+            "created": self.created.isoformat(),
+            "updated": self.updated.isoformat(),
+        }
+
+    def to_markdown(self) -> str:
+        """Generate markdown body following contract-driven format."""
+        lines = [
+            f"# {self.id}: {self.title}",
+            "",
+            "## Contract",
+            "",
+            "```typescript",
+            self.contract or "// Define exports here",
+            "```",
+            "",
+            "## Dependencies (Interfaces Only)",
+            "",
+            "```typescript",
+            self.dependencies or "// Interface contracts from dependent tasks",
+            "```",
+            "",
+            "## Test Specification",
+            "",
+            "```typescript",
+            self.test_specification or "// Complete, runnable test code",
+            "```",
+            "",
+            "## Output Files",
+            "",
+            "```",
+            self.output_files or "WRITE: path/to/file.ts (~X lines)",
+            "```",
+            "",
+            "## Verification (Deterministic)",
+            "",
+            "```bash",
+            self.verification or "# Commands to verify success",
+            "```",
+            "",
+            "## Done When",
+            "",
+        ]
+        if self.done_when:
+            for criterion in self.done_when:
+                lines.append(f"- [ ] {criterion}")
+        else:
+            lines.append("- [ ] [Acceptance criterion]")
+
+        return "\n".join(lines)
+
+    @classmethod
+    def from_frontmatter(cls, frontmatter: dict, content: str) -> "Task":
+        """Create from parsed frontmatter and markdown content."""
+        return cls(
+            id=frontmatter["id"],
+            title=frontmatter["title"],
+            status=TaskStatus(frontmatter.get("status", "pending")),
+            layer=frontmatter.get("layer", 1),
+            track=TaskTrack(frontmatter.get("track", "backend")),
+            depends_on=frontmatter.get("depends_on", []),
+            estimated_complexity=TaskComplexity(
+                frontmatter.get("estimated_complexity", "medium")
+            ),
+            requirement=frontmatter.get("requirement"),
+            created=datetime.fromisoformat(frontmatter["created"]),
+            updated=datetime.fromisoformat(frontmatter["updated"]),
+            contract=_extract_code_block(content, "Contract"),
+            dependencies=_extract_code_block(content, "Dependencies (Interfaces Only)"),
+            test_specification=_extract_code_block(content, "Test Specification"),
+            output_files=_extract_code_block(content, "Output Files"),
+            verification=_extract_code_block(content, "Verification (Deterministic)"),
+            done_when=_extract_checklist(content, "Done When"),
+        )

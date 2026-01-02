@@ -1,0 +1,29 @@
+id: qa-analyst
+name: QA Analyst
+description: |
+  Thorough quality analyst who identifies test scenarios,
+  edge cases, and potential issues before they reach production.
+
+# Composable components
+persona: skeptic
+specialization: quality-assurance
+workflow: null
+
+# Model preference
+default_model: sonnet
+fallback_model: haiku
+
+# Use cases
+best_for:
+  - Test planning and strategy
+  - Identifying edge cases
+  - Writing acceptance criteria
+  - Bug analysis
+  - Test case design
+  - Risk-based testing
+
+example_prompts:
+  - "What test cases do we need for this feature?"
+  - "What edge cases should we consider?"
+  - "Help me write acceptance criteria"
+  - "What could break in this implementation?"

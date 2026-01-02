@@ -188,6 +188,9 @@ class REPL:
         console.print("    feature list   List features")
         console.print("    req new        Create a new requirement")
         console.print("    req list       List requirements")
+        console.print("    task new       Create a new task")
+        console.print("    task list      List tasks")
+        console.print("    task show <id> Show task details")
         console.print()
         console.print("  [bold]/perspective[/bold] (or /persona)")
         console.print("    list           List available perspectives")
@@ -315,7 +318,7 @@ class REPL:
         """Handle artifact commands."""
         if not args:
             console.print("[red]Usage:[/red] /artifact <type> <action>")
-            console.print("[dim]Types: feature, req[/dim]")
+            console.print("[dim]Types: feature, req, task[/dim]")
             return
 
         if not self.pm.current_project:
@@ -330,6 +333,8 @@ class REPL:
             self._handle_feature_command(action, subargs)
         elif artifact_type in ("req", "requirement", "requirements"):
             self._handle_requirement_command(action, subargs)
+        elif artifact_type in ("task", "tasks"):
+            self._handle_task_command(action, subargs)
         else:
             console.print(f"[red]Unknown artifact type:[/red] {artifact_type}")
 
@@ -466,6 +471,129 @@ class REPL:
         else:
             console.print(f"[red]Unknown action:[/red] {action}")
             console.print("[dim]Actions: new, list, show[/dim]")
+
+    def _handle_task_command(self, action: str, args: list[str]) -> None:
+        """Handle task artifact commands."""
+        from pm.models.artifact import TaskTrack, TaskComplexity
+
+        am = self._get_artifact_manager()
+
+        if action == "new":
+            if not args:
+                title = Prompt.ask("[bold]Task title[/bold]")
+            else:
+                title = " ".join(args)
+
+            track = Prompt.ask(
+                "[dim]Track[/dim]",
+                choices=["backend", "frontend", "shared"],
+                default="backend",
+            )
+            complexity = Prompt.ask(
+                "[dim]Complexity[/dim]",
+                choices=["trivial", "simple", "medium", "complex"],
+                default="medium",
+            )
+            layer = Prompt.ask("[dim]Layer[/dim]", default="1")
+
+            task = am.create_task(
+                title=title,
+                layer=int(layer),
+                track=TaskTrack(track),
+                complexity=TaskComplexity(complexity),
+            )
+            console.print(f"[green]Created task:[/green] {task.id} - {task.title}")
+            console.print(f"[dim]Edit the task file to add contract, tests, and verification[/dim]")
+
+        elif action == "list":
+            tasks = am.list_tasks()
+            if not tasks:
+                console.print("[dim]No tasks yet. Use /artifact task new[/dim]")
+                return
+
+            table = Table(title="Tasks")
+            table.add_column("ID", style="bold")
+            table.add_column("Title")
+            table.add_column("Status")
+            table.add_column("Track")
+            table.add_column("Layer")
+            table.add_column("Complexity")
+
+            for t in tasks:
+                status_colors = {
+                    "pending": "dim",
+                    "in_progress": "yellow",
+                    "completed": "green",
+                    "failed": "red",
+                    "blocked": "magenta",
+                }
+                status_color = status_colors.get(t.status.value, "white")
+                table.add_row(
+                    t.id,
+                    t.title[:40] + "..." if len(t.title) > 40 else t.title,
+                    f"[{status_color}]{t.status.value}[/{status_color}]",
+                    t.track.value,
+                    str(t.layer),
+                    t.estimated_complexity.value,
+                )
+            console.print(table)
+
+        elif action == "show":
+            if not args:
+                console.print("[red]Usage:[/red] /artifact task show <id>")
+                return
+            task = am.get_task(args[0])
+            if not task:
+                console.print(f"[red]Task not found:[/red] {args[0]}")
+                return
+
+            console.print()
+            console.print(f"[bold]{task.id}: {task.title}[/bold]")
+            console.print(
+                f"Status: {task.status.value} | Track: {task.track.value} | "
+                f"Layer: {task.layer} | Complexity: {task.estimated_complexity.value}"
+            )
+
+            if task.depends_on:
+                console.print(f"Dependencies: {', '.join(task.depends_on)}")
+            if task.requirement:
+                console.print(f"Requirement: {task.requirement}")
+
+            if task.contract and task.contract != "// Define exports here":
+                console.print("\n[bold]Contract:[/bold]")
+                console.print(f"```\n{task.contract}\n```")
+
+            if task.done_when:
+                console.print("\n[bold]Done When:[/bold]")
+                for criterion in task.done_when:
+                    console.print(f"  - [ ] {criterion}")
+
+            console.print()
+
+        elif action == "status":
+            if len(args) < 2:
+                console.print("[red]Usage:[/red] /artifact task status <id> <status>")
+                console.print("[dim]Statuses: pending, in_progress, completed, failed, blocked[/dim]")
+                return
+
+            from pm.models.artifact import TaskStatus
+
+            task_id = args[0]
+            try:
+                new_status = TaskStatus(args[1])
+            except ValueError:
+                console.print(f"[red]Invalid status:[/red] {args[1]}")
+                return
+
+            task = am.set_task_status(task_id, new_status)
+            if task:
+                console.print(f"[green]Updated:[/green] {task.id} → {task.status.value}")
+            else:
+                console.print(f"[red]Task not found:[/red] {task_id}")
+
+        else:
+            console.print(f"[red]Unknown action:[/red] {action}")
+            console.print("[dim]Actions: new, list, show, status[/dim]")
 
     def _cmd_context(self, args: list[str]) -> None:
         """Show conversation context."""

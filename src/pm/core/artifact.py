@@ -3,7 +3,16 @@
 from pathlib import Path
 from typing import Optional
 
-from pm.models.artifact import Feature, Requirement, ArtifactStatus, Priority
+from pm.models.artifact import (
+    Feature,
+    Requirement,
+    Task,
+    ArtifactStatus,
+    Priority,
+    TaskStatus,
+    TaskComplexity,
+    TaskTrack,
+)
 from pm.storage.files import (
     read_frontmatter_file,
     write_frontmatter_file,
@@ -21,10 +30,12 @@ class ArtifactManager:
         self.features_dir = project_path / "features"
         self.fr_dir = project_path / "requirements" / "functional"
         self.nfr_dir = project_path / "requirements" / "non-functional"
+        self.tasks_dir = project_path / "tasks"
 
         ensure_directory(self.features_dir)
         ensure_directory(self.fr_dir)
         ensure_directory(self.nfr_dir)
+        ensure_directory(self.tasks_dir)
 
     # Feature operations
 
@@ -180,4 +191,96 @@ class ArtifactManager:
 
         self.update_requirement(requirement)
         self.update_feature(feature)
+        return True
+
+    # Task operations
+
+    def create_task(
+        self,
+        title: str,
+        layer: int = 1,
+        track: TaskTrack = TaskTrack.BACKEND,
+        complexity: TaskComplexity = TaskComplexity.MEDIUM,
+        requirement_id: Optional[str] = None,
+        depends_on: Optional[list[str]] = None,
+    ) -> Task:
+        """Create a new task."""
+        existing_ids = [t.id for t in self.list_tasks()]
+        task_id = generate_id("T", existing_ids)
+
+        task = Task(
+            id=task_id,
+            title=title,
+            layer=layer,
+            track=track,
+            estimated_complexity=complexity,
+            requirement=requirement_id,
+            depends_on=depends_on or [],
+        )
+
+        self._save_task(task)
+        return task
+
+    def get_task(self, task_id: str) -> Optional[Task]:
+        """Get a task by ID."""
+        for path in self.tasks_dir.glob(f"{task_id}-*.md"):
+            frontmatter, content = read_frontmatter_file(path)
+            return Task.from_frontmatter(frontmatter, content)
+        return None
+
+    def list_tasks(self, status: Optional[TaskStatus] = None) -> list[Task]:
+        """List all tasks, optionally filtered by status."""
+        tasks = []
+        for path in sorted(self.tasks_dir.glob("T-*.md")):
+            frontmatter, content = read_frontmatter_file(path)
+            task = Task.from_frontmatter(frontmatter, content)
+            if status is None or task.status == status:
+                tasks.append(task)
+        return tasks
+
+    def update_task(self, task: Task) -> None:
+        """Update an existing task."""
+        from datetime import datetime
+
+        task.updated = datetime.now()
+        self._save_task(task)
+
+    def delete_task(self, task_id: str) -> bool:
+        """Delete a task by ID."""
+        for path in self.tasks_dir.glob(f"{task_id}-*.md"):
+            path.unlink()
+            return True
+        return False
+
+    def set_task_status(self, task_id: str, status: TaskStatus) -> Optional[Task]:
+        """Update a task's status."""
+        task = self.get_task(task_id)
+        if not task:
+            return None
+
+        task.status = status
+        self.update_task(task)
+        return task
+
+    def _save_task(self, task: Task) -> None:
+        """Save a task to disk."""
+        slug = slugify(task.title)
+        filename = f"{task.id}-{slug}.md"
+        path = self.tasks_dir / filename
+        write_frontmatter_file(path, task.to_frontmatter(), task.to_markdown())
+
+    def link_task_to_requirement(self, task_id: str, req_id: str) -> bool:
+        """Link a task to a requirement."""
+        task = self.get_task(task_id)
+        requirement = self.get_requirement(req_id)
+
+        if not task or not requirement:
+            return False
+
+        task.requirement = req_id
+        if task_id not in requirement.tasks:
+            requirement.tasks.append(task_id)
+
+        self.update_task(task)
+        self.update_requirement(requirement)
         return True

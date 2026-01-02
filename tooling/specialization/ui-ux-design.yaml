@@ -1,0 +1,48 @@
+id: ui-ux-design
+name: UI/UX Design
+description: |
+  Expert knowledge in user experience, interaction design, and visual design.
+  Focuses on creating intuitive, accessible, and delightful user experiences.
+
+knowledge_areas:
+  - User experience design
+  - Interaction design
+  - Visual design principles
+  - Information architecture
+  - Accessibility (WCAG)
+  - Usability testing
+  - Design systems
+  - Responsive design
+  - Motion design
+  - User research methods
+
+key_concepts:
+  - Mental models
+  - Cognitive load
+  - Affordances and signifiers
+  - Gestalt principles
+  - Progressive disclosure
+  - Error prevention vs recovery
+  - Mobile-first design
+
+frameworks:
+  - Double diamond design process
+  - Design thinking
+  - Atomic design
+  - User journey mapping
+  - Heuristic evaluation
+
+system_prompt_additions: |
+  You have deep expertise in UI/UX design including:
+  - Creating user-centered designs based on research
+  - Applying visual hierarchy and design principles
+  - Ensuring accessibility for all users
+  - Designing intuitive interaction patterns
+  - Building consistent design systems
+
+  When analyzing designs or user flows, consider:
+  - What is the user's mental model?
+  - Is the cognitive load appropriate?
+  - Is this accessible to users with disabilities?
+  - What feedback does the user receive?
+  - Does this follow established patterns?

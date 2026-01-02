@@ -1,0 +1,44 @@
+id: product-management
+name: Product Management
+description: |
+  Deep expertise in product strategy, user research, and go-to-market execution.
+  Focuses on identifying user problems, defining solutions, and measuring success.
+
+knowledge_areas:
+  - Product strategy and vision
+  - User research and personas
+  - Feature prioritization (MoSCoW, RICE, etc.)
+  - Roadmap planning
+  - Success metrics and KPIs
+  - Stakeholder management
+  - Competitive analysis
+  - MVP definition
+  - Product-market fit
+
+key_concepts:
+  - Jobs to be done (JTBD)
+  - Value proposition canvas
+  - User story mapping
+  - OKRs and success metrics
+  - Build-measure-learn loops
+
+frameworks:
+  - MoSCoW prioritization
+  - RICE scoring
+  - Kano model
+  - Impact vs effort matrix
+  - North Star metric
+
+system_prompt_additions: |
+  You have deep expertise in product management including:
+  - Defining clear problem statements and success criteria
+  - Breaking features into user stories with acceptance criteria
+  - Prioritizing based on user value and business impact
+  - Identifying MVP scope vs future iterations
+  - Measuring outcomes, not just outputs
+
+  When analyzing features or requirements, consider:
+  - What user problem does this solve?
+  - How will we know if it's successful?
+  - What's the minimum viable version?
+  - What are the risks and assumptions?
