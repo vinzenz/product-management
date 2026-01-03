@@ -210,6 +210,7 @@ Focus on actionable outcomes - features, requirements, and tasks that can be exe
         self._persona: Optional[Persona] = None
         self._project_name: Optional[str] = None
         self._project_status: Optional[str] = None
+        self._cli_session_id: Optional[str] = None  # Claude CLI session for continuity
 
     @property
     def model(self) -> str:
@@ -385,36 +386,25 @@ Focus on actionable outcomes - features, requirements, and tasks that can be exe
         return full_response
 
     def _chat_stream_claude_cli(self, user_message: str) -> Generator[str, None, str]:
-        """Stream response using claude CLI tool."""
-        # Build the prompt with context
+        """Stream response using claude CLI tool with native session management."""
         system_prompt = self.context.system_prompt or self.DEFAULT_SYSTEM_PROMPT
-
-        # Build conversation context for claude CLI
-        prompt_parts = []
-
-        # Add previous messages as context
-        if len(self.context.messages) > 1:  # More than just the current message
-            prompt_parts.append("Previous conversation:")
-            for msg in self.context.messages[:-1]:  # Exclude current message
-                role = "User" if msg.role == "user" else "Assistant"
-                prompt_parts.append(f"{role}: {msg.content}")
-            prompt_parts.append("")
-            prompt_parts.append("Current message:")
-
-        prompt_parts.append(user_message)
-        full_prompt = "\n".join(prompt_parts)
 
         # Build claude CLI command
         cmd = [
             "claude",
-            "-p", full_prompt,
+            "-p", user_message,
             "--output-format", "stream-json",
             "--verbose",
+            "--allowedTools", "",
         ]
 
-        # Add system prompt
-        if system_prompt:
-            cmd.extend(["--system-prompt", system_prompt])
+        # Use --resume for session continuity, or start fresh with system prompt
+        if self._cli_session_id:
+            cmd.extend(["--resume", self._cli_session_id])
+        else:
+            # First message in session - include system prompt
+            if system_prompt:
+                cmd.extend(["--system-prompt", system_prompt])
 
         # Set up environment with config directory override if specified
         env = os.environ.copy()
@@ -466,7 +456,12 @@ Focus on actionable outcomes - features, requirements, and tasks that can be exe
                                 yield text
 
                     elif data.get("type") == "result":
-                        # Final result - extract text if we haven't already
+                        # Final result - extract session ID for continuity
+                        session_id = data.get("session_id")
+                        if session_id:
+                            self._cli_session_id = session_id
+
+                        # Extract text if we haven't already
                         if not full_response:
                             result_text = data.get("result", "")
                             if result_text:
@@ -607,8 +602,9 @@ Focus on actionable outcomes - features, requirements, and tasks that can be exe
             raise RuntimeError(f"Summarization failed: {e}") from e
 
     def clear_context(self) -> None:
-        """Clear conversation history."""
+        """Clear conversation history and CLI session."""
         self.context.clear()
+        self._cli_session_id = None  # Reset CLI session for fresh start
         self._rebuild_system_prompt()
 
     def get_context_summary(self) -> str:

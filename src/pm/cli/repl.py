@@ -12,6 +12,7 @@ from pm.core.artifact import ArtifactManager
 from pm.core.conversation import AVAILABLE_MODELS, PROVIDERS, ConversationManager, list_models_by_provider
 from pm.core.persona import PersonaManager
 from pm.core.project import ProjectManager
+from pm.cli.plan_commands import PlanCommands
 
 console = Console()
 
@@ -25,6 +26,7 @@ class REPL:
         self._artifact_manager: Optional[ArtifactManager] = None
         self._conversation: Optional[ConversationManager] = None
         self._persona_manager: Optional[PersonaManager] = None
+        self._plan_commands: Optional[PlanCommands] = None
         self.commands: dict[str, Callable[[list[str]], None]] = {
             "/help": self._cmd_help,
             "/quit": self._cmd_quit,
@@ -38,6 +40,7 @@ class REPL:
             "/persona": self._cmd_perspective,  # Alias
             "/model": self._cmd_model,
             "/summarize": self._cmd_summarize,
+            "/plan": self._cmd_plan,
         }
 
     def run(self) -> None:
@@ -201,6 +204,15 @@ class REPL:
         console.print("  [bold]/model[/bold]")
         console.print("    list           List available models")
         console.print("    switch <id>    Switch model (sonnet, haiku, opus)")
+        console.print()
+        console.print("  [bold]/plan[/bold]")
+        console.print("    start          Start new planning session")
+        console.print("    status         Show planning status")
+        console.print("    continue       Continue from checkpoint")
+        console.print("    approve        Approve current checkpoint")
+        console.print("    reject         Reject and request revision")
+        console.print("    layers         List architecture layers")
+        console.print("    groups <id>    List groups in a layer")
         console.print()
         console.print("  [bold]/status[/bold]          Show current context")
         console.print("  [bold]/context[/bold]         Show conversation context")
@@ -830,4 +842,25 @@ class REPL:
         except ValueError as e:
             console.print(f"[red]Configuration error:[/red] {e}")
         except RuntimeError as e:
+            console.print(f"[red]Error:[/red] {e}")
+
+    def _get_plan_commands(self) -> PlanCommands:
+        """Get or create the plan commands handler."""
+        if not self.pm.current_project:
+            raise ValueError("No project selected. Use /project switch <id> first.")
+
+        project_path = self.pm.get_project_path()
+
+        if self._plan_commands is None or self._plan_commands.project_path != project_path:
+            model = self._conversation.model_key if self._conversation else "claude"
+            self._plan_commands = PlanCommands(project_path, model)
+
+        return self._plan_commands
+
+    def _cmd_plan(self, args: list[str]) -> None:
+        """Handle /plan commands."""
+        try:
+            plan_cmds = self._get_plan_commands()
+            plan_cmds.handle_command(args)
+        except ValueError as e:
             console.print(f"[red]Error:[/red] {e}")
